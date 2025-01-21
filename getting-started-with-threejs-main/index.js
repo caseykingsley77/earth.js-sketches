@@ -20,6 +20,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
+//Star Setup
 const stars = getStarfield({numStars: 1000});
 scene.add(stars);
 
