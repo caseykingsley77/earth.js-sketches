@@ -36,6 +36,60 @@ scene.add(sun);
 const solarSystem = new THREE.Group();
 scene.add(solarSystem);
 
+// Earth setup (from first script)
+const earthGroup = new THREE.Group();
+earthGroup.rotation.z = -23.4 * Math.PI / 180; // Earth's tilt
+
+const earthDetail = 12;
+const earthTextureLoader = new THREE.TextureLoader();
+const earthGeometry = new THREE.IcosahedronGeometry(1, earthDetail);
+const earthMaterial = new THREE.MeshPhongMaterial({
+  map: earthTextureLoader.load("./textures/00_earthmap1k.jpg"),
+  specularMap: earthTextureLoader.load("./textures/02_earthspec1k.jpg"),
+  bumpMap: earthTextureLoader.load("./textures/01_earthbump1k.jpg"),
+  bumpScale: 0.04,
+});
+const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
+earthGroup.add(earthMesh);
+
+// Lights for Earth
+const lightsMat = new THREE.MeshBasicMaterial({
+  map: earthTextureLoader.load("./textures/03_earthlights1k.jpg"),
+  blending: THREE.AdditiveBlending,
+});
+const lightsMesh = new THREE.Mesh(earthGeometry, lightsMat);
+earthGroup.add(lightsMesh);
+
+// Clouds on Earth
+const cloudsMat = new THREE.MeshStandardMaterial({
+  map: earthTextureLoader.load("./textures/04_earthcloudmap.jpg"),
+  transparent: true,
+  opacity: 0.8,
+  blending: THREE.AdditiveBlending,
+  alphaMap: earthTextureLoader.load('./textures/05_earthcloudmaptrans.jpg'),
+});
+const cloudMesh = new THREE.Mesh(earthGeometry, cloudsMat);
+cloudMesh.scale.setScalar(1.003);
+earthGroup.add(cloudMesh);
+
+// Earth glow (Fresnel effect)
+const fresnelMat = getFresnelMat();
+const glowMesh = new THREE.Mesh(earthGeometry, fresnelMat);
+glowMesh.scale.setScalar(1.01);
+earthGroup.add(glowMesh);
+
+// Create Moon for Earth
+const moonGeometry = new THREE.SphereGeometry(0.27, 32, 32);
+const moonMaterial = new THREE.MeshPhongMaterial({
+  map: textureLoader.load('https://upload.wikimedia.org/wikipedia/commons/d/db/Moonmap_from_clementine_data.png'),
+  bumpScale: 0.06,
+});
+const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+earthGroup.add(moon);
+
+// Add Earth group to the solar system
+solarSystem.add(earthGroup);
+
 // Planet data
 const planetsData = [
   {
@@ -53,22 +107,6 @@ const planetsData = [
     texture: "https://s3.tebi.io/planets/textures/venusmap.jpg",
     moons: [],
     orbitSpeed: 0.001,
-  },
-  {
-    name: "Earth",
-    radius: 1,
-    distance: 11,
-    texture: "https://s3.tebi.io/planets/textures/00_earthmap1k.jpg",
-    moons: [
-      {
-        name: "Moon",
-        radius: 0.27,
-        distance: 2,
-        texture: "https://upload.wikimedia.org/wikipedia/commons/d/db/Moonmap_from_clementine_data.png",
-        orbitSpeed: 0.0003,
-      },
-    ],
-    orbitSpeed: 0.00005,
   },
   {
     name: "Mars",
@@ -128,13 +166,7 @@ const planetsData = [
   },
 ];
 
-const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
-
-sunLight.position.set(-2,0.5, 1.5)
-
-scene.add(sunLight);
-
-// Create planets and moons
+// Create other planets (skip Earth since it's already added)
 planetsData.forEach((planetData) => {
   const planetGroup = new THREE.Group();
   const planetGeometry = new THREE.SphereGeometry(planetData.radius, 32, 32);
@@ -147,57 +179,31 @@ planetsData.forEach((planetData) => {
   // Position planet
   planetGroup.position.x = planetData.distance;
 
-  // Create moons
-  planetData.moons.forEach((moonData) => {
-    const moonGroup = new THREE.Group();
-    const moonGeometry = new THREE.SphereGeometry(moonData.radius, 16, 16);
-    const moonMaterial = new THREE.MeshPhongMaterial({
-      map: textureLoader.load(moonData.texture),
-    });
-    const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-
-    // Position moon
-    moonMesh.position.x = moonData.distance;
-    moonGroup.add(moonMesh);
-    moonGroup.userData = {
-      orbitRadius: moonData.distance,
-      orbitSpeed: moonData.orbitSpeed,
-    };
-
-    planetGroup.add(moonGroup);
-  });
-
-  planetGroup.userData = {
-    orbitRadius: planetData.distance,
-    orbitSpeed: planetData.orbitSpeed,
-  };
-
   solarSystem.add(planetGroup);
 });
+
+// Lighting
+const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+sunLight.position.set(-2, 0.5, 1.5);
+scene.add(sunLight);
 
 // Animation loop
 function animate() {
   requestAnimationFrame(animate);
 
-  stars.rotation.y -= 0.0002;
+  // Rotate Earth and Moon
+  earthMesh.rotation.y += 0.002;
+  moon.rotation.y += 0.02;
 
-  // Rotate planets around the Sun
+  // Rotate other planets around the Sun
   solarSystem.children.forEach((planetGroup) => {
-    const { orbitRadius, orbitSpeed } = planetGroup.userData || {};
-    if (orbitRadius) {
-      const time = Date.now() * orbitSpeed;
-      planetGroup.position.x = Math.cos(time) * orbitRadius;
-      planetGroup.position.z = Math.sin(time) * orbitRadius;
-
-      // Rotate moons around their planet
-      planetGroup.children.forEach((moonGroup) => {
-        const { orbitRadius: moonRadius, orbitSpeed: moonSpeed } = moonGroup.userData || {};
-        if (moonRadius) {
-          const moonTime = Date.now() * moonSpeed;
-          moonGroup.position.x = Math.cos(moonTime) * moonRadius;
-          moonGroup.position.z = Math.sin(moonTime) * moonRadius;
-        }
-      });
+    if (planetGroup !== earthGroup) {
+      const { orbitRadius, orbitSpeed } = planetGroup.userData || {};
+      if (orbitRadius) {
+        const time = Date.now() * orbitSpeed;
+        planetGroup.position.x = Math.cos(time) * orbitRadius;
+        planetGroup.position.z = Math.sin(time) * orbitRadius;
+      }
     }
   });
 
